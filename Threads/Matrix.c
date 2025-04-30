@@ -5,20 +5,26 @@
 
 typedef struct {
     int id;
-    int row;
-    int col;
-    int **A;
-    int **B;
+    int m, n;
+    int total_threads;
+    int **A, **B;
 } ThreadData;
 
-void *transpor_elemento(void *arg) {
+void *transpor_varios_elementos(void *arg) {
     ThreadData *data = (ThreadData *)arg;
-    int i = data->row;
-    int j = data->col;
-    data->B[j][i] = data->A[i][j];
+    int id = data->id;
+    int m = data->m;
+    int n = data->n;
+    int total = m * n;
 
-    printf("Thread %d (ID: %lu) transposicionou A[%d][%d] = %d → B[%d][%d]\n",
-           data->id, pthread_self(), i, j, data->A[i][j], j, i);
+    // Cada thread pega blocos de elementos
+    for (int idx = id; idx < total; idx += data->total_threads) {
+        int i = idx / n;
+        int j = idx % n;
+        data->B[j][i] = data->A[i][j];
+        printf("Thread %d (ID: %lu) transposicionou A[%d][%d] = %d → B[%d][%d]\n",
+               id, pthread_self(), i, j, data->A[i][j], j, i);
+    }
 
     return NULL;
 }
@@ -31,7 +37,8 @@ int **alocar_matriz(int rows, int cols) {
 }
 
 void liberar_matriz(int **mat, int rows) {
-    for (int i = 0; i < rows; i++) free(mat[i]);
+    for (int i = 0; i < rows; i++)
+        free(mat[i]);
     free(mat);
 }
 
@@ -44,17 +51,25 @@ void imprimir_matriz(int **mat, int rows, int cols) {
 }
 
 int main() {
-    int m, n;
+    int m, n, num_threads;
+
     printf("Digite o número de linhas (M): ");
     scanf("%d", &m);
     printf("Digite o número de colunas (N): ");
     scanf("%d", &n);
 
-    int total_threads = m * n;
-    printf("Número de threads: %d\n", total_threads);
+    int total_elementos = m * n;
+    printf("Número máximo de threads permitidas: %d\n", total_elementos);
+    printf("Digite o número de threads (1 a %d): ", total_elementos);
+    scanf("%d", &num_threads);
+
+    if (num_threads < 1 || num_threads > total_elementos) {
+        printf("Número de threads inválido!\n");
+        return 1;
+    }
 
     int **A = alocar_matriz(m, n);
-    int **B = alocar_matriz(n, m);  // transposta
+    int **B = alocar_matriz(n, m);
 
     srand(time(NULL));
     for (int i = 0; i < m; i++)
@@ -64,26 +79,23 @@ int main() {
     printf("\nMatriz A:\n");
     imprimir_matriz(A, m, n);
 
-    pthread_t threads[total_threads];
-    ThreadData dados[total_threads];
-    int t = 0;
+    pthread_t threads[num_threads];
+    ThreadData dados[num_threads];
 
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            dados[t] = (ThreadData){
-                .id = t,
-                .row = i,
-                .col = j,
-                .A = A,
-                .B = B
-            };
-            pthread_create(&threads[t], NULL, transpor_elemento, &dados[t]);
-            t++;
-        }
+    for (int t = 0; t < num_threads; t++) {
+        dados[t] = (ThreadData){
+            .id = t,
+            .m = m,
+            .n = n,
+            .total_threads = num_threads,
+            .A = A,
+            .B = B
+        };
+        pthread_create(&threads[t], NULL, transpor_varios_elementos, &dados[t]);
     }
 
-    for (int i = 0; i < total_threads; i++)
-        pthread_join(threads[i], NULL);
+    for (int t = 0; t < num_threads; t++)
+        pthread_join(threads[t], NULL);
 
     printf("\nMatriz B (Transposta):\n");
     imprimir_matriz(B, n, m);
