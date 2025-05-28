@@ -5,7 +5,7 @@
 
 typedef struct {
     int id;
-    int m, n;
+    int linhas, colunas;
     int total_threads;
     int **A, **B;
 } ThreadData;
@@ -13,14 +13,14 @@ typedef struct {
 void *transpor_varios_elementos(void *arg) {
     ThreadData *data = (ThreadData *)arg;
     int id = data->id;
-    int m = data->m;
-    int n = data->n;
-    int total = m * n;
+    int linhas = data->linhas;
+    int colunas = data->colunas;
+    int total = linhas * colunas;
 
     // Cada thread pega blocos de elementos
     for (int idx = id; idx < total; idx += data->total_threads) {
-        int i = idx / n;
-        int j = idx % n;
+        int i = idx / colunas;
+        int j = idx % colunas;
         data->B[j][i] = data->A[i][j];
         printf("Thread %d (ID: %lu) transposicionou A[%d][%d] = %d → B[%d][%d]\n",
                id, pthread_self(), i, j, data->A[i][j], j, i);
@@ -51,14 +51,14 @@ void imprimir_matriz(int **mat, int rows, int cols) {
 }
 
 int main() {
-    int m, n, num_threads;
+    int linhas, colunas, num_threads;
 
     printf("Digite o número de linhas (M): ");
-    scanf("%d", &m);
+    scanf("%d", &linhas);
     printf("Digite o número de colunas (N): ");
-    scanf("%d", &n);
+    scanf("%d", &colunas);
 
-    int total_elementos = m * n;
+    int total_elementos = linhas * colunas;
     printf("Número máximo de threads permitidas: %d\n", total_elementos);
     printf("Digite o número de threads (1 a %d): ", total_elementos);
     scanf("%d", &num_threads);
@@ -68,16 +68,16 @@ int main() {
         return 1;
     }
 
-    int **A = alocar_matriz(m, n);
-    int **B = alocar_matriz(n, m);
+    int **A = alocar_matriz(linhas, colunas);
+    int **B = alocar_matriz(colunas, linhas);
 
     srand(time(NULL));
-    for (int i = 0; i < m; i++)
-        for (int j = 0; j < n; j++)
+    for (int i = 0; i < linhas; i++)
+        for (int j = 0; j < colunas; j++)
             A[i][j] = rand() % 100;
 
     printf("\nMatriz A:\n");
-    imprimir_matriz(A, m, n);
+    imprimir_matriz(A, linhas, colunas);
 
     pthread_t threads[num_threads];
     ThreadData dados[num_threads];
@@ -85,8 +85,8 @@ int main() {
     for (int t = 0; t < num_threads; t++) {
         dados[t] = (ThreadData){
             .id = t,
-            .m = m,
-            .n = n,
+            .linhas = linhas,
+            .colunas = colunas,
             .total_threads = num_threads,
             .A = A,
             .B = B
@@ -98,9 +98,9 @@ int main() {
         pthread_join(threads[t], NULL);
 
     printf("\nMatriz B (Transposta):\n");
-    imprimir_matriz(B, n, m);
+    imprimir_matriz(B, colunas, linhas);
 
-    liberar_matriz(A, m);
-    liberar_matriz(B, n);
+    liberar_matriz(A, linhas);
+    liberar_matriz(B, colunas);
     return 0;
 }
